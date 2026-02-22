@@ -2,6 +2,8 @@
 
 import json
 import os
+import shutil
+from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
@@ -107,6 +109,22 @@ class StationManager:
         """Add a station and save."""
         self._stations.append(station)
         self.save()
+
+    def backup_stations(self):
+        """Backup stations.json to a timestamped file."""
+        if not STATIONS_FILE.exists():
+            return
+            
+        backup_dir = DATA_DIR / "backup"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"stations_{timestamp}.json"
+        
+        try:
+            shutil.copy2(STATIONS_FILE, backup_dir / backup_filename)
+        except OSError as e:
+            print(f"Failed to backup stations.json: {e}")
 
     def remove_station(self, index: int):
         """Remove station by index and save."""

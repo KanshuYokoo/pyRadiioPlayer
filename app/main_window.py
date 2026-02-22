@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         # Sidebar
         self.sidebar.station_selected.connect(self._on_station_selected)
         self.sidebar.search_requested.connect(self._show_search)
+        self.sidebar.remove_requested.connect(self._on_station_remove_requested)
 
         # Station page
         self.station_page.play_requested.connect(self._play_stream)
@@ -133,6 +134,30 @@ class MainWindow(QMainWindow):
             self.content_stack.setCurrentIndex(1)
             # Auto-play radio stations
             self._play_stream(station.url, station.name)
+
+    @Slot(int)
+    def _on_station_remove_requested(self, index: int):
+        station = self.station_manager.get_station(index)
+        if not station:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Remove Station",
+            f"Are you sure you want to remove '{station.name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Stop playback
+            self.playback_bar._stop()
+            # Backup
+            self.station_manager.backup_stations()
+            # Remove
+            self.station_manager.remove_station(index)
+            # Refresh Sidebar UI
+            self.sidebar.refresh()
 
     @Slot()
     def _show_search(self):

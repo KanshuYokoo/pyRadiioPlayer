@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QAbstractItemView,
 )
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot, QTimer
 from PySide6.QtGui import QIcon
 
 from app.models.station import Station, StationManager
@@ -22,11 +22,11 @@ class Sidebar(QWidget):
 
     station_selected = Signal(int)  # index of selected station
     search_requested = Signal()
+    remove_requested = Signal(int)  # index of station to remove
 
     def __init__(self, station_manager: StationManager, parent=None):
         super().__init__(parent)
         self.station_manager = station_manager
-        self._remove_mode = False
         self.setFixedWidth(260)
         self._setup_ui()
         self._refresh_list()
@@ -80,32 +80,27 @@ class Sidebar(QWidget):
         # Remove button (bottom-left)
         self.remove_btn = QPushButton("−")
         self.remove_btn.setFixedSize(32, 32)
-        self.remove_btn.setToolTip("Remove station")
+        self.remove_btn.setToolTip("Remove selected station")
         self.remove_btn.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self.remove_btn.clicked.connect(self._toggle_remove_mode)
+        self.remove_btn.clicked.connect(self._on_remove_clicked)
         bottom_layout.addWidget(self.remove_btn)
 
         bottom_layout.addStretch()
-
-        self.mode_label = QLabel("")
-        self.mode_label.setStyleSheet("font-size: 11px; color: gray;")
-        bottom_layout.addWidget(self.mode_label)
-
         layout.addWidget(bottom)
 
     def _refresh_list(self):
         """Rebuild the list widget from the station manager."""
+        old_state = self.list_widget.blockSignals(True)
         self.list_widget.clear()
         for station in self.station_manager.stations:
             icon = "🎙" if station.station_type == "podcast" else "📻"
             item_text = f"{icon}  {station.name}"
 
-            if self._remove_mode:
-                item_text = f"🗑  {station.name}"
-
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, station)
             self.list_widget.addItem(item)
+            
+        self.list_widget.blockSignals(old_state)
 
     @Slot()
     def _on_add(self):
@@ -121,27 +116,17 @@ class Sidebar(QWidget):
             self._refresh_list()
 
     @Slot()
-    def _toggle_remove_mode(self):
-        self._remove_mode = not self._remove_mode
-        if self._remove_mode:
-            self.mode_label.setText("Click item to remove")
-            self.remove_btn.setStyleSheet(
-                "font-size: 18px; font-weight: bold; background-color: #e74c3c; color: white; border-radius: 4px;"
-            )
-        else:
-            self.mode_label.setText("")
-            self.remove_btn.setStyleSheet("font-size: 18px; font-weight: bold;")
-        self._refresh_list()
+    def _on_remove_clicked(self):
+        row = self.list_widget.currentRow()
+        if row >= 0:
+            self.remove_requested.emit(row)
 
     @Slot(int)
     def _on_selection_changed(self, row: int):
         if row < 0:
             return
-        if self._remove_mode:
-            self.station_manager.remove_station(row)
-            self._refresh_list()
-        else:
-            self.station_selected.emit(row)
+            
+        self.station_selected.emit(row)
 
     def add_station_external(self, station: Station):
         """Add a station from external source (e.g. search page)."""
