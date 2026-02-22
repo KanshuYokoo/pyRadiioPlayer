@@ -70,3 +70,50 @@ class PodcastCache:
             pass
             
         return info, merged_episodes
+
+    @staticmethod
+    def get_download_path(feed_url: str, audio_url: str) -> Path:
+        """Get the expected local file path for a downloaded episode."""
+        feed_hash = hashlib.md5(feed_url.encode('utf-8')).hexdigest()
+        ep_hash = hashlib.md5(audio_url.encode('utf-8')).hexdigest()
+        download_dir = Path.home() / ".radio_player" / "podcasts" / feed_hash
+        download_dir.mkdir(parents=True, exist_ok=True)
+        return download_dir / f"{ep_hash}.mp3"
+
+    @classmethod
+    def _update_episode_state(cls, feed_url: str, audio_url: str, downloaded_path: str):
+        """Helper to update the downloaded_path key for a specific episode."""
+        path = cls._get_file_path(feed_url)
+        if not path.exists():
+            return
+            
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            updated = False
+            for ep in data.get("episodes", []):
+                if ep.get("audio_url") == audio_url:
+                    if downloaded_path:
+                        ep["downloaded_path"] = downloaded_path
+                    else:
+                        ep.pop("downloaded_path", None)
+                    updated = True
+                    break
+                    
+            if updated:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    @classmethod
+    def mark_downloaded(cls, feed_url: str, audio_url: str, file_path: Path):
+        """Mark an episode as downloaded in the cache."""
+        cls._update_episode_state(feed_url, audio_url, str(file_path))
+
+    @classmethod
+    def mark_deleted(cls, feed_url: str, audio_url: str):
+        """Remove the downloaded mark from an episode in the cache."""
+        cls._update_episode_state(feed_url, audio_url, "")
+
