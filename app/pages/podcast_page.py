@@ -21,7 +21,7 @@ class EpisodeFetchWorker(QThread):
 
     from PySide6.QtCore import Signal as _Signal
 
-    finished = _Signal(list, dict)
+    finished = _Signal(object, list, dict)
 
     def __init__(self, feed_url: str, parent=None):
         super().__init__(parent)
@@ -30,7 +30,7 @@ class EpisodeFetchWorker(QThread):
     def run(self):
         info = fetch_feed_info(self.feed_url)
         episodes = fetch_episodes(self.feed_url)
-        self.finished.emit(episodes, info)
+        self.finished.emit(self, episodes, info)
 
 
 class PodcastPage(QWidget):
@@ -40,7 +40,8 @@ class PodcastPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._worker = None
+        self._current_worker = None
+        self._active_workers = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -99,12 +100,22 @@ class PodcastPage(QWidget):
         self._feed_url = feed_url
 
         # Fetch in background thread
-        self._worker = EpisodeFetchWorker(feed_url)
-        self._worker.finished.connect(self._on_episodes_loaded)
-        self._worker.start()
+        worker = EpisodeFetchWorker(feed_url)
+        self._active_workers.append(worker)
+        self._current_worker = worker
 
-    @Slot(list, dict)
-    def _on_episodes_loaded(self, episodes: list, info: dict):
+        worker.finished.connect(self._on_episodes_loaded)
+        worker.start()
+
+    @Slot(object, list, dict)
+    def _on_episodes_loaded(self, worker: object, episodes: list, info: dict):
+        if worker in self._active_workers:
+            self._active_workers.remove(worker)
+        worker.deleteLater()
+
+        if worker is not self._current_worker:
+            return
+
         self.loading_label.setText("")
         if info.get("title"):
             self.title_label.setText(info["title"])

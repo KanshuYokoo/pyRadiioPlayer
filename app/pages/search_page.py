@@ -23,7 +23,7 @@ class SearchWorker(QThread):
 
     from PySide6.QtCore import Signal as _Signal
 
-    finished = _Signal(list, str)  # results, search_type
+    finished = _Signal(object, list, str)  # worker, results, search_type
 
     def __init__(self, query: str, search_type: str, parent=None):
         super().__init__(parent)
@@ -35,7 +35,7 @@ class SearchWorker(QThread):
             results = search_stations(self.query)
         else:
             results = search_podcasts(self.query)
-        self.finished.emit(results, self.search_type)
+        self.finished.emit(self, results, self.search_type)
 
 
 class SearchPage(QWidget):
@@ -45,7 +45,8 @@ class SearchPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._worker = None
+        self._current_worker = None
+        self._active_workers = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -116,12 +117,22 @@ class SearchPage(QWidget):
         self.status_label.setText(f"Searching {search_type}s for \"{query}\"…")
         self.search_btn.setEnabled(False)
 
-        self._worker = SearchWorker(query, search_type)
-        self._worker.finished.connect(self._on_results)
-        self._worker.start()
+        worker = SearchWorker(query, search_type)
+        self._active_workers.append(worker)
+        self._current_worker = worker
 
-    @Slot(list, str)
-    def _on_results(self, results: list, search_type: str):
+        worker.finished.connect(self._on_results)
+        worker.start()
+
+    @Slot(object, list, str)
+    def _on_results(self, worker: object, results: list, search_type: str):
+        if worker in self._active_workers:
+            self._active_workers.remove(worker)
+        worker.deleteLater()
+
+        if worker is not self._current_worker:
+            return
+
         self.search_btn.setEnabled(True)
 
         if search_type == "radio":
