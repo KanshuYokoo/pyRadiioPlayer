@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt, Signal, QThread, Slot
 from PySide6.QtGui import QFont
 
 from app.services.feed_parser import fetch_episodes, fetch_feed_info
+from app.models.podcast_cache import PodcastCache
 
 
 class EpisodeFetchWorker(QThread):
@@ -92,12 +93,17 @@ class PodcastPage(QWidget):
 
     def set_podcast(self, name: str, feed_url: str):
         """Load podcast info and episodes from the feed URL."""
-        self.title_label.setText(name)
-        self.desc_label.setText("")
-        self.loading_label.setText("Loading episodes…")
+        self._feed_url = feed_url
         self._clear_episodes()
 
-        self._feed_url = feed_url
+        cached_info, cached_episodes = PodcastCache.load(feed_url)
+        
+        if cached_episodes:
+            self._update_ui_with_data(cached_info, cached_episodes, is_cached=True)
+        else:
+            self.title_label.setText(name)
+            self.desc_label.setText("")
+            self.loading_label.setText("Loading episodes…")
 
         # Fetch in background thread
         worker = EpisodeFetchWorker(feed_url)
@@ -106,6 +112,29 @@ class PodcastPage(QWidget):
 
         worker.finished.connect(self._on_episodes_loaded)
         worker.start()
+
+    def _update_ui_with_data(self, info: dict, episodes: list, is_cached: bool = False):
+        self._clear_episodes()
+        
+        if info.get("title"):
+            self.title_label.setText(info["title"])
+        if info.get("description"):
+            self.desc_label.setText(info["description"])
+
+        if not episodes:
+            if not is_cached:
+                self.loading_label.setText("No episodes found.")
+            return
+
+        for ep in episodes:
+            self._add_episode_row(ep)
+            
+        if is_cached:
+            self.loading_label.setText("Updating episodes...")
+            self.episodes_header.setText(f"Episodes ({len(episodes)} cached)")
+        else:
+            self.loading_label.setText("")
+            self.episodes_header.setText(f"Episodes ({len(episodes)})")
 
     @Slot(object, list, dict)
     def _on_episodes_loaded(self, worker: object, episodes: list, info: dict):
@@ -116,20 +145,8 @@ class PodcastPage(QWidget):
         if worker is not self._current_worker:
             return
 
-        self.loading_label.setText("")
-        if info.get("title"):
-            self.title_label.setText(info["title"])
-        if info.get("description"):
-            self.desc_label.setText(info["description"])
-
-        if not episodes:
-            self.loading_label.setText("No episodes found.")
-            return
-
-        self.episodes_header.setText(f"Episodes ({len(episodes)})")
-
-        for ep in episodes:
-            self._add_episode_row(ep)
+        merged_info, merged_episodes = PodcastCache.save_and_merge(self._feed_url, info, episodes)
+        self._update_ui_with_data(merged_info, merged_episodes, is_cached=False)
 
     def _add_episode_row(self, ep: dict):
         """Add a single episode row to the list."""
