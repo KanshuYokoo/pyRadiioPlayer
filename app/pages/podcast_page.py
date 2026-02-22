@@ -1,5 +1,7 @@
 """Podcast detail page — shows podcast info and episode list."""
 
+import os
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -15,6 +17,7 @@ from PySide6.QtGui import QFont
 
 from app.services.feed_parser import fetch_episodes, fetch_feed_info
 from app.models.podcast_cache import PodcastCache
+from app.services.download_service import EpisodeDownloadWorker
 
 
 class EpisodeFetchWorker(QThread):
@@ -43,6 +46,7 @@ class PodcastPage(QWidget):
         super().__init__(parent)
         self._current_worker = None
         self._active_workers = []
+        self._download_workers = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -184,6 +188,23 @@ class PodcastPage(QWidget):
         play_btn.clicked.connect(lambda checked, u=audio_url, t=title: self.play_requested.emit(u, t))
         row_layout.addWidget(play_btn)
 
+        # Download / Delete button
+        download_btn = QPushButton()
+        download_btn.setFixedSize(140, 36)
+        downloaded_path = ep.get("downloaded_path")
+        is_downloaded = False
+        if downloaded_path and Path(downloaded_path).exists():
+            is_downloaded = True
+            
+        if is_downloaded:
+            download_btn.setText("Delete the episode")
+            download_btn.clicked.connect(lambda checked, u=audio_url, b=download_btn: self._on_delete_clicked(u, b))
+        else:
+            download_btn.setText("download")
+            download_btn.clicked.connect(lambda checked, u=audio_url, b=download_btn: self._on_download_clicked(u, b))
+            
+        row_layout.addWidget(download_btn)
+
         # Insert before the spacer
         count = self.episodes_layout.count()
         self.episodes_layout.insertWidget(count - 1, row)
@@ -195,3 +216,53 @@ class PodcastPage(QWidget):
             widget = item.widget()
             if widget:
                 widget.deleteLater()
+
+    def _on_download_clicked(self, audio_url: str, btn: QPushButton):
+        btn.setText("Downloading...")
+        btn.setEnabled(False)
+        
+        dest_path = PodcastCache.get_download_path(self._feed_url, audio_url)
+        worker = EpisodeDownloadWorker(audio_url, dest_path)
+        self._download_workers.append(worker)
+        
+        worker.finished_download.connect(
+            lambda success, path, err, u=audio_url, b=btn, w=worker: self._on_download_finished(success, path, err, u, b, w)
+        )
+        worker.start()
+
+    def _on_download_finished(self, success: bool, path: str, err: str, audio_url: str, btn: QPushButton, worker: EpisodeDownloadWorker):
+        if worker in self._download_workers:
+            self._download_workers.remove(worker)
+        worker.deleteLater()
+        
+        if success:
+            PodcastCache.mark_downloaded(self._feed_url, audio_url, Path(path))
+            btn.setText("Delete the episode")
+            btn.setEnabled(True)
+            # Safe disconnect: QObject.disconnect() or using try-except
+            try:
+                btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            btn.clicked.connect(lambda checked, u=audio_url, b=btn: self._on_delete_clicked(u, b))
+        else:
+            btn.setText("download")
+            btn.setEnabled(True)
+            print(f"Download failed: {err}")
+
+    def _on_delete_clicked(self, audio_url: str, btn: QPushButton):
+        dest_path = PodcastCache.get_download_path(self._feed_url, audio_url)
+        if dest_path.exists():
+            try:
+                os.remove(dest_path)
+            except OSError as e:
+                print(f"Error deleting file: {e}")
+                return
+                
+        PodcastCache.mark_deleted(self._feed_url, audio_url)
+        btn.setText("download")
+        try:
+            btn.clicked.disconnect()
+        except RuntimeError:
+            pass
+        btn.clicked.connect(lambda checked, u=audio_url, b=btn: self._on_download_clicked(u, b))
