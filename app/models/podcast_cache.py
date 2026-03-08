@@ -2,8 +2,10 @@
 
 import json
 import hashlib
+import os
 from pathlib import Path
 from typing import Tuple, List, Dict
+from urllib.parse import urlparse
 
 CACHE_DIR = Path.home() / ".radio_player" / "podcasts"
 
@@ -78,7 +80,9 @@ class PodcastCache:
         ep_hash = hashlib.md5(audio_url.encode('utf-8')).hexdigest()
         download_dir = Path.home() / ".radio_player" / "podcasts" / feed_hash
         download_dir.mkdir(parents=True, exist_ok=True)
-        return download_dir / f"{ep_hash}.mp3"
+        url_path = urlparse(audio_url).path
+        ext = os.path.splitext(url_path)[1] or ".mp3"
+        return download_dir / f"{ep_hash}{ext}"
 
     @classmethod
     def _update_episode_state(cls, feed_url: str, audio_url: str, downloaded_path: str):

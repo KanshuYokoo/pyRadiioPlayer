@@ -1,5 +1,7 @@
 """Add Station dialog — small popup with name and URL fields."""
 
+from urllib.parse import urlparse
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -10,6 +12,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QPushButton,
     QDialogButtonBox,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
@@ -68,8 +71,19 @@ class AddStationDialog(QDialog):
         layout.addWidget(button_box)
 
     def _on_accept(self):
-        if self.name_edit.text().strip() and self.url_edit.text().strip():
-            self.accept()
+        name = self.name_edit.text().strip()
+        url = self.url_edit.text().strip()
+        if not name or not url:
+            return
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            QMessageBox.warning(
+                self,
+                "Invalid URL",
+                "Please enter a valid URL starting with http:// or https://",
+            )
+            return
+        self.accept()
 
     def get_data(self) -> dict:
         """Return the entered station data."""

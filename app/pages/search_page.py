@@ -21,9 +21,7 @@ from app.services.itunes_search import search_podcasts
 class SearchWorker(QThread):
     """Background thread for search queries."""
 
-    from PySide6.QtCore import Signal as _Signal
-
-    finished = _Signal(object, list, str)  # worker, results, search_type
+    finished = Signal(object, list, str)  # worker, results, search_type
 
     def __init__(self, query: str, search_type: str, parent=None):
         super().__init__(parent)
