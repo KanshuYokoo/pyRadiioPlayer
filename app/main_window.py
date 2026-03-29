@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
 
         if reply == QMessageBox.StandardButton.Yes:
             # Stop playback
-            self.playback_bar._stop()
+            self.playback_bar.stop()
             # Backup
             self.station_manager.backup_stations()
             # Remove

@@ -46,7 +46,7 @@ class PlaybackBar(QWidget):
         self.stop_btn = QPushButton("⏹")
         self.stop_btn.setFixedSize(40, 40)
         self.stop_btn.setToolTip("Stop")
-        self.stop_btn.clicked.connect(self._stop)
+        self.stop_btn.clicked.connect(self.stop)
         layout.addWidget(self.stop_btn)
 
         # Now-playing label
@@ -86,7 +86,7 @@ class PlaybackBar(QWidget):
             self._player.play()
 
     @Slot()
-    def _stop(self):
+    def stop(self):
         self._player.stop()
         self.now_playing_label.setText("Stopped")
         self.play_btn.setText("▶")

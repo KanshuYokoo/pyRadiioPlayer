@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QThread, Slot
 from PySide6.QtGui import QFont
 
-from app.services.feed_parser import fetch_episodes, fetch_feed_info
+from app.services.feed_parser import fetch_feed
 from app.models.podcast_cache import PodcastCache
 from app.services.download_service import EpisodeDownloadWorker
 
@@ -23,17 +23,14 @@ from app.services.download_service import EpisodeDownloadWorker
 class EpisodeFetchWorker(QThread):
     """Background thread to fetch podcast episodes."""
 
-    from PySide6.QtCore import Signal as _Signal
-
-    finished = _Signal(object, list, dict)
+    finished = Signal(object, list, dict)
 
     def __init__(self, feed_url: str, parent=None):
         super().__init__(parent)
         self.feed_url = feed_url
 
     def run(self):
-        info = fetch_feed_info(self.feed_url)
-        episodes = fetch_episodes(self.feed_url)
+        info, episodes = fetch_feed(self.feed_url)
         self.finished.emit(self, episodes, info)
 
 
