@@ -51,6 +51,42 @@ source venv/bin/activate
 python main.py
 ```
 
+## Building a Standalone Executable (PyInstaller)
+
+Install PyInstaller (already in `requirements.txt`):
+
+```bash
+pip install pyinstaller
+```
+
+Build using the spec file:
+
+```bash
+pyinstaller main.spec
+```
+
+Output in `dist/`:
+- `pyRadioTunes` — Unix binary, runnable from terminal
+- `pyRadioTunes.app` — macOS double-clickable app bundle
+
+### Renaming the executable
+
+Edit these two lines in `main.spec`:
+
+```python
+# In the EXE block:
+name='pyRadioTunes',
+
+# In the BUNDLE block:
+name='pyRadioTunes.app',
+```
+
+Change both to your preferred name, then rebuild with `pyinstaller main.spec`.
+
+> **Note:** PyInstaller builds for the OS it runs on. Run it separately on macOS, Linux, and Windows to get platform-specific outputs.
+
+---
+
 ## Verification Results
 
 - ✅ Virtual environment created with Python 3.9
