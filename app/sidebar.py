@@ -58,7 +58,7 @@ class Sidebar(QWidget):
         self.add_btn = QPushButton("+")
         self.add_btn.setFixedSize(32, 32)
         self.add_btn.setToolTip("Add station")
-        self.add_btn.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.add_btn.setStyleSheet("QPushButton { font-size: 18px; font-weight: bold; }")
         self.add_btn.clicked.connect(self._on_add)
         header_layout.addWidget(self.add_btn)
 
