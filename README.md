@@ -85,6 +85,21 @@ Change both to your preferred name, then rebuild with `pyinstaller main.spec`.
 
 > **Note:** PyInstaller builds for the OS it runs on. Run it separately on macOS, Linux, and Windows to get platform-specific outputs.
 
+### MacOS app 
+
+*.app bundles on macOS are directories, not executables — you can't run them with ./. Use open instead:
+
+```
+open dist/pyRadioTunes.app
+```
+Or run the executable directly inside the bundle:
+
+```
+./dist/pyRadioTunes.app/Contents/MacOS/pyRadioTunes
+```
+
+The second form is useful for seeing error output in the terminal if the app crashes on launch.
+
 ---
 
 ## Verification Results
