@@ -128,6 +128,12 @@ class Sidebar(QWidget):
             
         self.station_selected.emit(row)
 
+    def select_row(self, index: int):
+        """Highlight a row in the list without emitting station_selected."""
+        old_state = self.list_widget.blockSignals(True)
+        self.list_widget.setCurrentRow(index)
+        self.list_widget.blockSignals(old_state)
+
     def add_station_external(self, station: Station):
         """Add a station from external source (e.g. search page)."""
         self.station_manager.add_station(station)

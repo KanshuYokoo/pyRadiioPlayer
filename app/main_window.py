@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenuBar,
     QMessageBox,
+    QPushButton,
 )
 from PySide6.QtCore import Qt, Slot
 
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
 
         # Data
         self.station_manager = StationManager()
+        self._current_station_index: int | None = None
 
         # Setup
         self._setup_menubar()
@@ -67,6 +69,25 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar(self.station_manager)
         content_layout.addWidget(self.sidebar)
 
+        # Right panel: top bar + content stack
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+
+        # Top bar with "Show Now Playing" button (right-aligned)
+        top_bar = QWidget()
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(8, 6, 8, 6)
+        top_bar_layout.addStretch()
+        self.now_playing_btn = QPushButton("Show Now Playing")
+        self.now_playing_btn.setFixedHeight(28)
+        self.now_playing_btn.setToolTip("Return to the currently playing station")
+        self.now_playing_btn.setEnabled(False)
+        self.now_playing_btn.clicked.connect(self._on_now_playing_requested)
+        top_bar_layout.addWidget(self.now_playing_btn)
+        right_layout.addWidget(top_bar)
+
         # Content stack
         self.content_stack = QStackedWidget()
 
@@ -97,7 +118,8 @@ class MainWindow(QMainWindow):
         self.search_page = SearchPage()
         self.content_stack.addWidget(self.search_page)  # index 3
 
-        content_layout.addWidget(self.content_stack, stretch=1)
+        right_layout.addWidget(self.content_stack, stretch=1)
+        content_layout.addWidget(right_panel, stretch=1)
 
         main_layout.addWidget(content_area, stretch=1)
 
@@ -126,6 +148,9 @@ class MainWindow(QMainWindow):
         if not station:
             return
 
+        self._current_station_index = index
+        self.now_playing_btn.setEnabled(True)
+
         if station.station_type == "podcast":
             self.podcast_page.set_podcast(station.name, station.url)
             self.content_stack.setCurrentIndex(2)
@@ -134,6 +159,19 @@ class MainWindow(QMainWindow):
             self.content_stack.setCurrentIndex(1)
             # Auto-play radio stations
             self._play_stream(station.url, station.name)
+
+    @Slot()
+    def _on_now_playing_requested(self):
+        if self._current_station_index is None:
+            return
+        station = self.station_manager.get_station(self._current_station_index)
+        if not station:
+            return
+        self.sidebar.select_row(self._current_station_index)
+        if station.station_type == "podcast":
+            self.content_stack.setCurrentIndex(2)
+        else:
+            self.content_stack.setCurrentIndex(1)
 
     @Slot(int)
     def _on_station_remove_requested(self, index: int):
@@ -158,6 +196,14 @@ class MainWindow(QMainWindow):
             self.station_manager.remove_station(index)
             # Refresh Sidebar UI
             self.sidebar.refresh()
+            # Update current station tracking
+            if self._current_station_index is not None:
+                if index == self._current_station_index:
+                    self._current_station_index = None
+                    self.now_playing_btn.setEnabled(False)
+                    self.content_stack.setCurrentIndex(0)
+                elif index < self._current_station_index:
+                    self._current_station_index -= 1
 
     @Slot()
     def _show_search(self):
